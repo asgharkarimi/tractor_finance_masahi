@@ -8,6 +8,7 @@ import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
+import '../services/database_service.dart';
 
 class MapLandPickerScreen extends StatefulWidget {
   const MapLandPickerScreen({super.key});
@@ -31,7 +32,33 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
   @override
   void initState() {
     super.initState();
-    _getUserLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadInitialLocation();
+    });
+  }
+
+  Future<void> _loadInitialLocation() async {
+    // Try to load last saved location
+    final settings = DatabaseService.getSettings();
+    if (settings.lastLatitude != null && settings.lastLongitude != null) {
+      final savedLocation =
+          LatLng(settings.lastLatitude!, settings.lastLongitude!);
+      setState(() {
+        _userLocation = savedLocation;
+      });
+      // Move map to saved location
+      _mapController.move(savedLocation, 17.0);
+    } else {
+      // Get current location if no saved location
+      await _getUserLocation();
+    }
+  }
+
+  Future<void> _saveUserLocation(LatLng location) async {
+    final settings = DatabaseService.getSettings();
+    settings.lastLatitude = location.latitude;
+    settings.lastLongitude = location.longitude;
+    await DatabaseService.updateSettings(settings);
   }
 
   void _toggleMapType() {
@@ -67,7 +94,8 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('لطفاً دسترسی موقعیت مکانی را در تنظیمات فعال کنید')),
+                content:
+                    Text('لطفاً دسترسی موقعیت مکانی را در تنظیمات فعال کنید')),
           );
         }
         setState(() {
@@ -81,10 +109,15 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
+      final newLocation = LatLng(position.latitude, position.longitude);
+
       setState(() {
-        _userLocation = LatLng(position.latitude, position.longitude);
+        _userLocation = newLocation;
         _isLoadingLocation = false;
       });
+
+      // Save location to settings
+      await _saveUserLocation(newLocation);
 
       // Move map to user location
       _mapController.move(_userLocation!, 17.0);
@@ -170,10 +203,10 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
         ui.Image image = await boundary.toImage(pixelRatio: 2.0);
         ByteData? byteData =
             await image.toByteData(format: ui.ImageByteFormat.png);
-        
+
         if (byteData != null) {
           Uint8List pngBytes = byteData.buffer.asUint8List();
-          
+
           // Save to temporary directory
           final directory = await getTemporaryDirectory();
           final imagePath =
@@ -223,99 +256,100 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
           RepaintBoundary(
             key: _mapKey,
             child: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _initialPosition,
-              initialZoom: 15.0,
-              onTap: _onMapTapped,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _initialPosition,
+                initialZoom: 15.0,
+                onTap: _onMapTapped,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all,
+                ),
               ),
-            ),
-            children: [
-              // Map tiles based on view type
-              if (_isSatelliteView) ...[
-                // Satellite imagery - trying multiple sources
-                TileLayer(
-                  urlTemplate:
-                      'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-                  userAgentPackageName: 'com.example.tractor_finance_manage',
-                  fallbackUrl:
-                      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                ),
-              ] else
-                // Standard map
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.tractor_finance_manage',
-                ),
-              // Polygon layer
-              if (_polygonPoints.length >= 3)
-                PolygonLayer(
-                  polygons: [
-                    Polygon(
-                      points: _polygonPoints,
-                      color: const Color(0xFF66BB6A).withOpacity(0.3),
-                      borderColor: const Color(0xFF66BB6A),
-                      borderStrokeWidth: 3,
-                      isFilled: true,
-                    ),
-                  ],
-                ),
-              // Markers layer
-              MarkerLayer(
-                markers: [
-                  // User location marker
-                  if (_userLocation != null)
-                    Marker(
-                      point: _userLocation!,
-                      width: 50,
-                      height: 50,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.3),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.blue, width: 3),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.my_location,
-                            color: Colors.blue,
-                            size: 20,
-                          ),
-                        ),
+              children: [
+                // Map tiles based on view type
+                if (_isSatelliteView) ...[
+                  // Satellite imagery - trying multiple sources
+                  TileLayer(
+                    urlTemplate:
+                        'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+                    userAgentPackageName: 'com.example.tractor_finance_manage',
+                    fallbackUrl:
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  ),
+                ] else
+                  // Standard map
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.tractor_finance_manage',
+                  ),
+                // Polygon layer
+                if (_polygonPoints.length >= 3)
+                  PolygonLayer(
+                    polygons: [
+                      Polygon(
+                        points: _polygonPoints,
+                        color: const Color(0xFF66BB6A).withOpacity(0.3),
+                        borderColor: const Color(0xFF66BB6A),
+                        borderStrokeWidth: 3,
+                        isFilled: true,
                       ),
-                    ),
-                  // Polygon point markers
-                  ..._polygonPoints.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final point = entry.value;
-                    return Marker(
-                      point: point,
-                      width: 40,
-                      height: 40,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF66BB6A),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${index + 1}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                    ],
+                  ),
+                // Markers layer
+                MarkerLayer(
+                  markers: [
+                    // User location marker
+                    if (_userLocation != null)
+                      Marker(
+                        point: _userLocation!,
+                        width: 50,
+                        height: 50,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.3),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.blue, width: 3),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.my_location,
+                              color: Colors.blue,
+                              size: 20,
                             ),
                           ),
                         ),
                       ),
-                    );
-                  }),
-                ],
-              ),
-            ],
+                    // Polygon point markers
+                    ..._polygonPoints.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final point = entry.value;
+                      return Marker(
+                        point: point,
+                        width: 40,
+                        height: 40,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF66BB6A),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ],
             ),
           ),
 
@@ -404,7 +438,7 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
           // Confirm button at bottom
           if (_calculatedArea > 0)
             Positioned(
-              bottom: 24,
+              bottom: 40,
               left: 16,
               right: 16,
               child: ElevatedButton.icon(

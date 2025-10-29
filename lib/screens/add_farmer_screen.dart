@@ -4,6 +4,7 @@ import 'dart:io';
 import '../models/farmer.dart';
 import '../models/land.dart';
 import '../services/database_service.dart';
+import 'map_land_picker_screen.dart';
 
 class AddFarmerScreen extends StatefulWidget {
   final Farmer? farmer;
@@ -105,6 +106,31 @@ class _AddFarmerScreenState extends State<AddFarmerScreen> {
           SnackBar(content: Text('خطا در گرفتن عکس: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _pickFromMapForLand(int index) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MapLandPickerScreen(),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        // Set area
+        final area = result['area'] as double?;
+        if (area != null) {
+          _lands[index].hectaresController.text = area.toStringAsFixed(2);
+        }
+        
+        // Set screenshot as image
+        final imagePath = result['imagePath'] as String?;
+        if (imagePath != null) {
+          _lands[index].imagePath = imagePath;
+        }
+      });
     }
   }
 
@@ -272,14 +298,34 @@ class _AddFarmerScreenState extends State<AddFarmerScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      TextField(
-                        controller: land.hectaresController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: 'مساحت (هکتار)',
-                          prefixIcon: Icon(Icons.straighten),
-                        ),
+                      // Hectares Field with Map Button
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: land.hectaresController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                labelText: 'مساحت (هکتار)',
+                                prefixIcon: Icon(Icons.straighten),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF66BB6A),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.map, color: Colors.white),
+                              onPressed: () => _pickFromMapForLand(index),
+                              tooltip: 'انتخاب از نقشه',
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       TextField(
