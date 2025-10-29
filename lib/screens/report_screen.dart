@@ -140,7 +140,9 @@ class ReportScreen extends StatelessWidget {
                       const SizedBox(height: 20),
 
                       // PDF Button
-                      SizedBox(
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: farmers.isEmpty
@@ -171,6 +173,7 @@ class ReportScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
+                        ),
                         ),
                       ),
                       const SizedBox(height: 24),

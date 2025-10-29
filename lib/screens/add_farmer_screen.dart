@@ -382,12 +382,15 @@ class _AddFarmerScreenState extends State<AddFarmerScreen> {
               );
             }).toList(),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _saveFarmer,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: ElevatedButton(
+                onPressed: _saveFarmer,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                ),
+                child: const Text('ذخیره', style: TextStyle(fontSize: 16)),
               ),
-              child: const Text('ذخیره', style: TextStyle(fontSize: 16)),
             ),
           ],
         ),

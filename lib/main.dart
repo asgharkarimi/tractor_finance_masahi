@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/database_service.dart';
-import 'screens/home_screen.dart';
+import 'services/supabase_service.dart';
+import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -57,12 +58,18 @@ class _InitializationScreenState extends State<InitializationScreen> {
   Future<void> _initialize() async {
     try {
       WidgetsFlutterBinding.ensureInitialized();
+
+      // Initialize Supabase
+      await SupabaseService.initialize();
+
+      // Initialize local database
       await DatabaseService.init();
+
       // Navigate to home screen after a short delay
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
       }
     } catch (e) {

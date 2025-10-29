@@ -525,7 +525,9 @@ class FarmerDetailScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     
                     // Add Land Button (outside card)
-                    SizedBox(
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
@@ -545,6 +547,7 @@ class FarmerDetailScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                      ),
                       ),
                     ),
 
@@ -692,7 +695,9 @@ class FarmerDetailScreen extends StatelessWidget {
 
                             // Add Payment Button
                             const SizedBox(height: 16),
-                            SizedBox(
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
                                 onPressed: () =>
@@ -711,6 +716,7 @@ class FarmerDetailScreen extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
+                              ),
                               ),
                             ),
                           ],

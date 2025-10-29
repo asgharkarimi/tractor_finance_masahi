@@ -107,7 +107,8 @@ class _SimpleAreaCalculatorScreenState
             ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -179,12 +180,15 @@ class _SimpleAreaCalculatorScreenState
             const SizedBox(height: 12),
 
             // Add Point Button
-            ElevatedButton.icon(
-              onPressed: _addPoint,
-              icon: const Icon(Icons.add_location),
-              label: const Text('افزودن نقطه'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.all(14),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: ElevatedButton.icon(
+                onPressed: _addPoint,
+                icon: const Icon(Icons.add_location),
+                label: const Text('افزودن نقطه'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(14),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -255,17 +259,21 @@ class _SimpleAreaCalculatorScreenState
             // Confirm Button
             if (_calculatedArea > 0) ...[
               const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _confirmArea,
-                icon: const Icon(Icons.check),
-                label: const Text('تایید و استفاده از این مساحت'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                  backgroundColor: const Color(0xFF66BB6A),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ElevatedButton.icon(
+                  onPressed: _confirmArea,
+                  icon: const Icon(Icons.check),
+                  label: const Text('تایید و استفاده از این مساحت'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: const Color(0xFF66BB6A),
+                  ),
                 ),
               ),
             ],
           ],
+        ),
         ),
       ),
     );

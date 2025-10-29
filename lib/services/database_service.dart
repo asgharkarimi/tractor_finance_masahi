@@ -3,6 +3,7 @@ import '../models/farmer.dart';
 import '../models/land.dart';
 import '../models/payment.dart';
 import '../models/settings.dart';
+import 'supabase_service.dart';
 
 class DatabaseService {
   static const String farmersBox = 'farmers';
@@ -44,10 +45,22 @@ class DatabaseService {
 
   static Future<void> addFarmer(Farmer farmer) async {
     await getFarmersBox().put(farmer.id, farmer);
+    // Sync to Supabase
+    try {
+      await SupabaseService.syncFarmer(farmer);
+    } catch (e) {
+      print('Failed to sync farmer to Supabase: $e');
+    }
   }
 
   static Future<void> deleteFarmer(String id) async {
     await getFarmersBox().delete(id);
+    // Delete from Supabase
+    try {
+      await SupabaseService.deleteFarmer(id);
+    } catch (e) {
+      print('Failed to delete farmer from Supabase: $e');
+    }
   }
 
   static List<Farmer> getAllFarmers() {

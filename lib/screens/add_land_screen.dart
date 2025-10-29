@@ -307,12 +307,15 @@ class _AddLandScreenState extends State<AddLandScreen> {
             const SizedBox(height: 32),
 
             // Save Button
-            ElevatedButton(
-              onPressed: _saveLand,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: ElevatedButton(
+                onPressed: _saveLand,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                ),
+                child: const Text('ذخیره زمین', style: TextStyle(fontSize: 16)),
               ),
-              child: const Text('ذخیره زمین', style: TextStyle(fontSize: 16)),
             ),
           ],
         ),
