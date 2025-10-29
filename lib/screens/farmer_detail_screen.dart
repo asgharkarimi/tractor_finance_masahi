@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'dart:io';
 import '../models/farmer.dart';
 import '../models/land.dart';
 import '../models/payment.dart';
 import '../models/settings.dart';
 import '../services/database_service.dart';
+import '../services/supabase_service.dart';
 import '../utils/number_formatter.dart';
+import '../widgets/land_image_widget.dart';
 import 'add_farmer_screen.dart';
 import 'add_land_screen.dart';
 import 'image_viewer_screen.dart';
@@ -318,26 +319,9 @@ class FarmerDetailScreen extends StatelessWidget {
                                                             .vertical(
                                                             top: Radius.circular(
                                                                 12)),
-                                                    child: Image.file(
-                                                      File(land.imagePath!),
+                                                    child: LandImageWidget(
+                                                      imagePath: land.imagePath,
                                                       height: 180,
-                                                      width: double.infinity,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context,
-                                                          error, stackTrace) {
-                                                        return Container(
-                                                          height: 180,
-                                                          color: Colors.grey[300],
-                                                          child: const Center(
-                                                            child: Icon(
-                                                                Icons
-                                                                    .broken_image,
-                                                                size: 50,
-                                                                color:
-                                                                    Colors.grey),
-                                                          ),
-                                                        );
-                                                      },
                                                     ),
                                                   ),
                                                 ),
@@ -854,6 +838,13 @@ class FarmerDetailScreen extends StatelessWidget {
               farmer.payments.add(payment);
               await farmer.save();
 
+              // Sync to server
+              try {
+                await SupabaseService.syncFarmer(farmer);
+              } catch (e) {
+                // Ignore sync errors
+              }
+
               if (context.mounted) {
                 Navigator.pop(context);
               }
@@ -888,6 +879,13 @@ class FarmerDetailScreen extends StatelessWidget {
     if (confirm == true) {
       farmer.payments.remove(payment);
       await farmer.save();
+      
+      // Sync to server
+      try {
+        await SupabaseService.syncFarmer(farmer);
+      } catch (e) {
+        // Ignore sync errors
+      }
     }
   }
 
@@ -917,6 +915,13 @@ class FarmerDetailScreen extends StatelessWidget {
     if (confirm == true) {
       farmer.lands.remove(land);
       await farmer.save();
+      
+      // Sync to server
+      try {
+        await SupabaseService.syncFarmer(farmer);
+      } catch (e) {
+        // Ignore sync errors
+      }
     }
   }
 }

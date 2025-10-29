@@ -48,6 +48,7 @@ class InitializationScreen extends StatefulWidget {
 
 class _InitializationScreenState extends State<InitializationScreen> {
   String? _error;
+  String _statusMessage = 'در حال بارگذاری...';
 
   @override
   void initState() {
@@ -60,13 +61,44 @@ class _InitializationScreenState extends State<InitializationScreen> {
       WidgetsFlutterBinding.ensureInitialized();
 
       // Initialize Supabase
+      setState(() {
+        _statusMessage = 'اتصال به سرور...';
+      });
       await SupabaseService.initialize();
 
       // Initialize local database
+      setState(() {
+        _statusMessage = 'بارگذاری داده‌های محلی...';
+      });
       await DatabaseService.init();
 
-      // Navigate to home screen after a short delay
+      // Check server data
+      setState(() {
+        _statusMessage = 'بررسی داده‌های سرور...';
+      });
       await Future.delayed(const Duration(milliseconds: 500));
+
+      final hasConnection = await SupabaseService.checkConnection();
+
+      if (hasConnection) {
+        // Get server data count
+        final serverFarmersCount =
+            await SupabaseService.getServerFarmersCount();
+        final localFarmersCount = DatabaseService.getAllFarmers().length;
+
+        if (mounted) {
+          if (serverFarmersCount > 0 && localFarmersCount == 0) {
+            // Server has data, local is empty - ask to load
+            await _showLoadFromServerDialog(serverFarmersCount);
+          } else if (serverFarmersCount > 0 && localFarmersCount > 0) {
+            // Both have data - show comparison
+            await _showDataComparisonDialog(
+                localFarmersCount, serverFarmersCount);
+          }
+        }
+      }
+
+      // Navigate to login screen
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -77,6 +109,143 @@ class _InitializationScreenState extends State<InitializationScreen> {
         setState(() {
           _error = e.toString();
         });
+      }
+    }
+  }
+
+  Future<void> _showLoadFromServerDialog(int serverCount) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cloud_download, color: Color(0xFF66BB6A)),
+            SizedBox(width: 8),
+            Text('داده‌های سرور'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$serverCount کشاورز در سرور یافت شد.',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'آیا می‌خواهید داده‌های سرور را بارگذاری کنید؟',
+              style: TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('خیر، بعداً'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('بله، بارگذاری کن'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && mounted) {
+      setState(() {
+        _statusMessage = 'بارگذاری از سرور...';
+      });
+      try {
+        await SupabaseService.loadAllFromSupabase();
+      } catch (e) {
+        // Ignore error, will continue to app
+      }
+    }
+  }
+
+  Future<void> _showDataComparisonDialog(
+      int localCount, int serverCount) async {
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.sync, color: Color(0xFF66BB6A)),
+            SizedBox(width: 8),
+            Text('همگام‌سازی داده‌ها'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('داده‌های محلی:'),
+                      Text(
+                        '$localCount کشاورز',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('داده‌های سرور:'),
+                      Text(
+                        '$serverCount کشاورز',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'کدام داده‌ها را می‌خواهید استفاده کنید؟',
+              style: TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'skip'),
+            child: const Text('بعداً'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, 'merge'),
+            icon: const Icon(Icons.merge_type),
+            label: const Text('ترکیب هر دو'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF66BB6A),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'merge' && mounted) {
+      setState(() {
+        _statusMessage = 'همگام‌سازی هوشمند...';
+      });
+      try {
+        await SupabaseService.smartSync();
+      } catch (e) {
+        // Ignore error
       }
     }
   }
@@ -141,9 +310,9 @@ class _InitializationScreenState extends State<InitializationScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'در حال بارگذاری...',
-                  style: TextStyle(
+                Text(
+                  _statusMessage,
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Colors.white70,
                   ),
@@ -201,4 +370,4 @@ class _InitializationScreenState extends State<InitializationScreen> {
 // git commit -m "first commit"
 // git branch -M main
 // git remote add origin https://github.com/asgharkarimi/tractor_finance_masahi.git
-// git push -u origin main
+// لهف

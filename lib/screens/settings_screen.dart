@@ -113,6 +113,39 @@ class _SyncSectionState extends State<_SyncSection> {
   bool _isSyncing = false;
   bool _isLoading = false;
 
+  Future<void> _smartSync() async {
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      await SupabaseService.smartSync();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('همگام‌سازی هوشمند با موفقیت انجام شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در همگام‌سازی: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
+    }
+  }
+
   Future<void> _syncToSupabase() async {
     setState(() {
       _isSyncing = true;
@@ -123,7 +156,7 @@ class _SyncSectionState extends State<_SyncSection> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('همگام‌سازی با موفقیت انجام شد'),
+            content: Text('ارسال به سرور با موفقیت انجام شد'),
             backgroundColor: Colors.green,
           ),
         );
@@ -132,7 +165,7 @@ class _SyncSectionState extends State<_SyncSection> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در همگام‌سازی: $e'),
+            content: Text('خطا در ارسال: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -212,17 +245,31 @@ class _SyncSectionState extends State<_SyncSection> {
     return Column(
       children: [
         Card(
+          color: const Color(0xFFE8F5E9),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.cloud, color: Color(0xFF66BB6A)),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'داده‌ها به صورت خودکار با سرور همگام می‌شوند',
-                    style: TextStyle(fontSize: 12),
-                  ),
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFF66BB6A)),
+                    SizedBox(width: 8),
+                    Text(
+                      'همگام‌سازی هوشمند',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• داده‌های محلی و سرور را با هم ترکیب می‌کند\n'
+                  '• هیچ داده‌ای حذف نمی‌شود\n'
+                  '• تمام زمین‌ها و پرداختی‌ها حفظ می‌شوند',
+                  style: TextStyle(fontSize: 12),
                 ),
               ],
             ),
@@ -232,6 +279,25 @@ class _SyncSectionState extends State<_SyncSection> {
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: ElevatedButton.icon(
+            onPressed: _isSyncing ? null : _smartSync,
+            icon: _isSyncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            label: const Text('همگام‌سازی هوشمند'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.all(16),
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: const Color(0xFF66BB6A),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: OutlinedButton.icon(
             onPressed: _isSyncing ? null : _syncToSupabase,
             icon: _isSyncing
                 ? const SizedBox(
@@ -240,10 +306,12 @@ class _SyncSectionState extends State<_SyncSection> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.cloud_upload),
-            label: const Text('ارسال به سرور'),
-            style: ElevatedButton.styleFrom(
+            label: const Text('ارسال به سرور (بازنویسی)'),
+            style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.all(16),
               minimumSize: const Size(double.infinity, 50),
+              foregroundColor: const Color(0xFF66BB6A),
+              side: const BorderSide(color: Color(0xFF66BB6A)),
             ),
           ),
         ),
@@ -258,12 +326,12 @@ class _SyncSectionState extends State<_SyncSection> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.cloud_download),
-            label: const Text('دریافت از سرور'),
+            label: const Text('دریافت از سرور (بازنویسی)'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.all(16),
               minimumSize: const Size(double.infinity, 50),
-              foregroundColor: const Color(0xFF66BB6A),
-              side: const BorderSide(color: Color(0xFF66BB6A)),
+              foregroundColor: Colors.orange,
+              side: const BorderSide(color: Colors.orange),
             ),
           ),
         ),

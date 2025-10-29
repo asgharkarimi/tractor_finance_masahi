@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../models/farmer.dart';
 import '../models/land.dart';
+import '../services/supabase_service.dart';
 import 'map_land_picker_screen.dart';
 
 class AddLandScreen extends StatefulWidget {
@@ -167,11 +168,38 @@ class _AddLandScreenState extends State<AddLandScreen> {
       imagePath: _imagePath,
     );
 
+    // Save context before closing
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    // Close screen immediately
+    if (mounted) {
+      Navigator.pop(context);
+    }
+
+    // Save in background
     widget.farmer.lands.add(land);
     await widget.farmer.save();
 
-    if (mounted) {
-      Navigator.pop(context);
+    // Sync to server in background
+    try {
+      await SupabaseService.syncFarmer(widget.farmer);
+      // Show success message
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('زمین با موفقیت ذخیره شد'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // Show error message
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('زمین ذخیره شد اما خطا در ارسال به سرور: $e'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 

@@ -39,3 +39,14 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on farmers" ON farmers FOR ALL USING (true);
 CREATE POLICY "Allow all operations on lands" ON lands FOR ALL USING (true);
 CREATE POLICY "Allow all operations on payments" ON payments FOR ALL USING (true);
+
+-- Create storage bucket for land images
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('land-images', 'land-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Create storage policies
+CREATE POLICY "Allow public read access" ON storage.objects FOR SELECT USING (bucket_id = 'land-images');
+CREATE POLICY "Allow authenticated uploads" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'land-images');
+CREATE POLICY "Allow authenticated updates" ON storage.objects FOR UPDATE USING (bucket_id = 'land-images');
+CREATE POLICY "Allow authenticated deletes" ON storage.objects FOR DELETE USING (bucket_id = 'land-images');
