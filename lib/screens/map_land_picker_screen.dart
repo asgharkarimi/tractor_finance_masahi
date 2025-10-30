@@ -25,6 +25,8 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
   LatLng? _userLocation;
   bool _isLoadingLocation = false;
   bool _isSatelliteView = true; // Default to satellite
+  int? _draggingPointIndex; // Index of point being dragged
+  int? _selectedPointIndex; // Index of selected point for moving
 
   // Default location (Tehran, Iran)
   static const LatLng _initialPosition = LatLng(35.6892, 51.3890);
@@ -134,13 +136,62 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
   }
 
   void _onMapTapped(TapPosition tapPosition, LatLng position) {
-    setState(() {
-      _polygonPoints.add(position);
+    // Don't add new point if dragging
+    if (_draggingPointIndex != null) return;
 
-      // Calculate area if we have at least 3 points
+    setState(() {
+      // If a point is selected, move it to new position
+      if (_selectedPointIndex != null) {
+        _polygonPoints[_selectedPointIndex!] = position;
+        _selectedPointIndex = null; // Deselect after moving
+
+        // Recalculate area
+        if (_polygonPoints.length >= 3) {
+          _calculatedArea = _calculatePolygonArea(_polygonPoints);
+        }
+      } else {
+        // Add new point
+        _polygonPoints.add(position);
+
+        // Calculate area if we have at least 3 points
+        if (_polygonPoints.length >= 3) {
+          _calculatedArea = _calculatePolygonArea(_polygonPoints);
+        }
+      }
+    });
+  }
+
+  void _onPointTapped(int index) {
+    setState(() {
+      // Toggle selection
+      if (_selectedPointIndex == index) {
+        _selectedPointIndex = null; // Deselect if already selected
+      } else {
+        _selectedPointIndex = index; // Select this point
+      }
+    });
+  }
+
+  void _onPointDragStart(int index) {
+    setState(() {
+      _draggingPointIndex = index;
+    });
+  }
+
+  void _onPointDragUpdate(int index, LatLng newPosition) {
+    setState(() {
+      _polygonPoints[index] = newPosition;
+
+      // Recalculate area
       if (_polygonPoints.length >= 3) {
         _calculatedArea = _calculatePolygonArea(_polygonPoints);
       }
+    });
+  }
+
+  void _onPointDragEnd() {
+    setState(() {
+      _draggingPointIndex = null;
     });
   }
 
@@ -236,20 +287,6 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('انتخاب زمین روی نقشه'),
-        actions: [
-          if (_polygonPoints.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.undo),
-              onPressed: _undoLastPoint,
-              tooltip: 'حذف آخرین نقطه',
-            ),
-          if (_polygonPoints.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: _clearPoints,
-              tooltip: 'پاک کردن همه',
-            ),
-        ],
       ),
       body: Stack(
         children: [
@@ -320,28 +357,66 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
                           ),
                         ),
                       ),
-                    // Polygon point markers
+                    // Polygon point markers (draggable)
                     ..._polygonPoints.asMap().entries.map((entry) {
                       final index = entry.key;
                       final point = entry.value;
+                      final isDragging = _draggingPointIndex == index;
+                      final isSelected = _selectedPointIndex == index;
+
                       return Marker(
                         point: point,
-                        width: 40,
-                        height: 40,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF66BB6A),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
+                        width: (isDragging || isSelected) ? 24 : 16,
+                        height: (isDragging || isSelected) ? 24 : 16,
+                        child: GestureDetector(
+                          onTap: () => _onPointTapped(index),
+                          onLongPressStart: (_) => _onPointDragStart(index),
+                          onLongPressMoveUpdate: (details) {
+                            // Convert screen position to map coordinates
+                            final RenderBox? renderBox =
+                                context.findRenderObject() as RenderBox?;
+                            if (renderBox != null) {
+                              final localPosition = renderBox
+                                  .globalToLocal(details.globalPosition);
+                              final mapSize = renderBox.size;
+
+                              // Get map bounds
+                              final bounds =
+                                  _mapController.camera.visibleBounds;
+                              final latDiff = bounds.north - bounds.south;
+                              final lngDiff = bounds.east - bounds.west;
+
+                              // Calculate new position
+                              final newLat = bounds.north -
+                                  (localPosition.dy / mapSize.height) * latDiff;
+                              final newLng = bounds.west +
+                                  (localPosition.dx / mapSize.width) * lngDiff;
+
+                              _onPointDragUpdate(index, LatLng(newLat, newLng));
+                            }
+                          },
+                          onLongPressEnd: (_) => _onPointDragEnd(),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDragging
+                                  ? Colors.orange
+                                  : isSelected
+                                      ? Colors.blue
+                                      : const Color(0xFF66BB6A),
+                              shape: BoxShape.circle,
+                              border: Border.all(
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                width: (isDragging || isSelected) ? 3 : 2,
                               ),
+                              boxShadow: (isDragging || isSelected)
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ]
+                                  : null,
                             ),
                           ),
                         ),
@@ -370,14 +445,31 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
                         const Icon(Icons.info_outline,
                             color: Color(0xFF66BB6A)),
                         const SizedBox(width: 8),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'روی نقشه کلیک کنید تا نقاط زمین را مشخص کنید',
-                            style: TextStyle(fontSize: 12),
+                            _selectedPointIndex != null
+                                ? 'روی نقشه کلیک کنید تا نقطه انتخاب شده جابجا شود'
+                                : 'روی نقشه کلیک کنید تا نقاط زمین را مشخص کنید',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _selectedPointIndex != null
+                                  ? Colors.blue
+                                  : Colors.black87,
+                              fontWeight: _selectedPointIndex != null
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
                           ),
                         ),
                       ],
                     ),
+                    if (_selectedPointIndex != null) ...[
+                      const SizedBox(height: 4),
+                      const Text(
+                        '💡 برای لغو، دوباره روی نقطه کلیک کنید',
+                        style: TextStyle(fontSize: 11, color: Colors.blue),
+                      ),
+                    ],
                     if (_polygonPoints.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text(
@@ -402,9 +494,43 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
             ),
           ),
 
+          // Undo button (top)
+          if (_polygonPoints.isNotEmpty)
+            Positioned(
+              bottom: _calculatedArea > 0 ? 240 : 180,
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: _undoLastPoint,
+                backgroundColor: Colors.white,
+                heroTag: 'undo',
+                tooltip: 'حذف آخرین نقطه',
+                child: const Icon(
+                  Icons.undo,
+                  color: Colors.orange,
+                ),
+              ),
+            ),
+
+          // Clear all button
+          if (_polygonPoints.isNotEmpty)
+            Positioned(
+              bottom: _calculatedArea > 0 ? 170 : 110,
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: _clearPoints,
+                backgroundColor: Colors.white,
+                heroTag: 'clear',
+                tooltip: 'پاک کردن همه',
+                child: const Icon(
+                  Icons.clear,
+                  color: Colors.red,
+                ),
+              ),
+            ),
+
           // Map Type Toggle button
           Positioned(
-            bottom: _calculatedArea > 0 ? 170 : 110,
+            bottom: _calculatedArea > 0 ? 100 : 40,
             right: 16,
             child: FloatingActionButton(
               onPressed: _toggleMapType,
@@ -419,8 +545,8 @@ class _MapLandPickerScreenState extends State<MapLandPickerScreen> {
 
           // My Location button
           Positioned(
-            bottom: _calculatedArea > 0 ? 100 : 40,
-            right: 16,
+            bottom: _calculatedArea > 0 ? 30 : 40,
+            left: 16,
             child: FloatingActionButton(
               onPressed: _isLoadingLocation ? null : _getUserLocation,
               backgroundColor: Colors.white,

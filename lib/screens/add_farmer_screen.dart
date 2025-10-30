@@ -219,10 +219,36 @@ class _AddFarmerScreenState extends State<AddFarmerScreen> {
       payments: widget.farmer?.payments ?? [],
     );
 
-    await DatabaseService.addFarmer(farmer);
-
+    // Save context before closing
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isEdit = widget.farmer != null;
+    
+    // Close screen immediately
     if (mounted) {
       Navigator.pop(context);
+    }
+
+    // Save in background
+    try {
+      await DatabaseService.addFarmer(farmer);
+      
+      // Show success message
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(isEdit ? 'کشاورز با موفقیت ویرایش شد' : 'کشاورز با موفقیت ذخیره شد'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // Show error message
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('خطا در ذخیره: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 

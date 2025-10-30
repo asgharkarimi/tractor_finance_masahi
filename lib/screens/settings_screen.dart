@@ -40,14 +40,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    final settings = Settings(pricePerHectare: price);
-    await DatabaseService.updateSettings(settings);
-
+    // Save context before closing
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    // Close screen immediately
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تنظیمات ذخیره شد')),
-      );
       Navigator.pop(context);
+    }
+
+    // Save in background
+    try {
+      final settings = Settings(pricePerHectare: price);
+      await DatabaseService.updateSettings(settings);
+      
+      // Show success message
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('تنظیمات با موفقیت ذخیره شد'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // Show error message
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('خطا در ذخیره: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 

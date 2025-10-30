@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/supabase_service.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -27,6 +28,18 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _startBackgroundSync() {
+    // Start sync after a short delay
+    Future.delayed(const Duration(seconds: 2), () async {
+      try {
+        // Load full details for farmers that only have names
+        await SupabaseService.loadFullDetailsInBackground();
+      } catch (e) {
+        // Silently fail - don't disturb user
+      }
+    });
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -44,10 +57,13 @@ class _LoginScreenState extends State<LoginScreen> {
     // Check credentials
     if (_phoneController.text == _defaultPhone &&
         _passwordController.text == _defaultPassword) {
-      // Login successful
+      // Login successful - navigate to home
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
+      
+      // Start background sync after login
+      _startBackgroundSync();
     } else {
       // Login failed
       setState(() {

@@ -43,7 +43,8 @@ class SupabaseService {
           );
 
       // Get public URL
-      final publicUrl = client.storage.from(storageBucket).getPublicUrl(fileName);
+      final publicUrl =
+          client.storage.from(storageBucket).getPublicUrl(fileName);
 
       return publicUrl;
     } catch (e) {
@@ -64,7 +65,7 @@ class SupabaseService {
       // URL format: https://.../storage/v1/object/public/land-images/filename.jpg
       final uri = Uri.parse(imageUrl);
       String fileName = uri.pathSegments.last;
-      
+
       // If URL contains 'land-images', extract everything after it
       final pathString = uri.path;
       if (pathString.contains('land-images/')) {
@@ -78,7 +79,7 @@ class SupabaseService {
       final directory = await getApplicationDocumentsDirectory();
       final localPath = path.join(directory.path, 'images', fileName);
       final file = File(localPath);
-      
+
       if (await file.exists()) {
         return localPath; // Already downloaded
       }
@@ -215,7 +216,97 @@ class SupabaseService {
     }
   }
 
-  // Load all data from Supabase
+  // Load only farmer names (fast initial load)
+  static Future<void> loadFarmerNamesOnly() async {
+    try {
+      // Get only farmer names (no lands, no payments)
+      final farmersData = await client.from('farmers').select('id, name');
+
+      for (var farmerData in farmersData) {
+        final farmer = Farmer(
+          id: farmerData['id'] as String,
+          name: farmerData['name'] as String,
+          lands: [], // Empty for now
+          payments: [], // Empty for now
+        );
+
+        // Save without triggering sync
+        await DatabaseService.getFarmersBox().put(farmer.id, farmer);
+      }
+    } catch (e) {
+      print('Error loading farmer names: $e');
+      rethrow;
+    }
+  }
+
+  // Load full details for all farmers (background)
+  static Future<void> loadFullDetailsInBackground() async {
+    try {
+      final farmers = DatabaseService.getAllFarmers();
+
+      for (var farmer in farmers) {
+        // Skip if already has data
+        if (farmer.lands.isNotEmpty || farmer.payments.isNotEmpty) continue;
+
+        await _loadFarmerDetails(farmer.id);
+      }
+    } catch (e) {
+      print('Error loading full details: $e');
+    }
+  }
+
+  // Load details for a single farmer
+  static Future<void> _loadFarmerDetails(String farmerId) async {
+    try {
+      // Get lands
+      final landsData =
+          await client.from('lands').select().eq('farmer_id', farmerId);
+
+      final lands = <Land>[];
+      for (var landData in landsData) {
+        String? localImagePath;
+        final imageUrl = landData['image_path'] as String?;
+
+        // Download image if exists
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          localImagePath = await downloadImage(imageUrl);
+        }
+
+        lands.add(Land(
+          id: landData['id'] as String,
+          hectares: (landData['hectares'] as num).toDouble(),
+          name: landData['name'] as String?,
+          description: landData['description'] as String?,
+          imagePath: localImagePath ?? imageUrl,
+        ));
+      }
+
+      // Get payments
+      final paymentsData =
+          await client.from('payments').select().eq('farmer_id', farmerId);
+
+      final payments = paymentsData.map((paymentData) {
+        return Payment(
+          id: paymentData['id'] as String,
+          amount: (paymentData['amount'] as num).toDouble(),
+          date: DateTime.parse(paymentData['date'] as String),
+          note: paymentData['note'] as String?,
+        );
+      }).toList();
+
+      // Update farmer with full data
+      final farmer = DatabaseService.getFarmer(farmerId);
+      if (farmer != null) {
+        farmer.lands.addAll(lands);
+        farmer.payments.addAll(payments);
+        await DatabaseService.getFarmersBox().put(farmer.id, farmer);
+      }
+    } catch (e) {
+      print('Error loading details for farmer $farmerId: $e');
+    }
+  }
+
+  // Load all data from Supabase (full sync)
   static Future<void> loadAllFromSupabase() async {
     try {
       // Get all farmers
